@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yodnoma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ECEFF7;
+    --paper: #FFFFFF;
+    --ink: #1B1B3A;
+    --muted: #6B6F8D;
+    --line: #D9DDEC;
+    --accent: #5B3CC4;
+    --accent-ink: #FFFFFF;
+    --marker: #FFD84D;
+    --danger: #B3261E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12122A;
+      --paper: #1C1C3C;
+      --ink: #ECEBFF;
+      --muted: #9A9CC4;
+      --line: #2E2E56;
+      --accent: #8F7BFF;
+      --accent-ink: #12122A;
+      --marker: #E6B800;
+      --danger: #FF8A80;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: 16px; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Nunito", system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.5;
+    padding: 28px 16px 48px;
+  }
+  main { max-width: 520px; margin: 0 auto; }
+  h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: clamp(3rem, 14vw, 4.5rem);
+    line-height: 1;
+    margin: 0 0 8px;
+    letter-spacing: -0.02em;
+  }
+  .sub { margin: 0 0 24px; color: var(--muted); }
+
+  form { display: flex; gap: 10px; margin-bottom: 20px; }
+  input {
+    flex: 1; min-width: 0;
+    font: inherit; color: inherit;
+    background: var(--paper);
+    border: 2px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+  input:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  button {
+    font: inherit; font-weight: 700;
+    background: var(--accent); color: var(--accent-ink);
+    border: 0; border-radius: 14px;
+    padding: 14px 20px; cursor: pointer;
+    transition: transform .12s;
+  }
+  button:active { transform: scale(.96); }
+  button:disabled { opacity: .6; cursor: wait; }
+
+  /* Daftar varag'i */
+  .sheet {
+    background: var(--paper);
+    border-radius: 18px;
+    padding: 6px 0;
+    box-shadow: 0 10px 30px rgba(27, 27, 58, .08);
+    overflow: hidden;
+  }
+  .sheet-head {
+    display: flex; justify-content: space-between;
+    padding: 14px 20px 10px;
+    color: var(--muted); font-weight: 600;
+    border-bottom: 2px solid var(--line);
+  }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    padding: 14px 20px 14px 18px;
+    border-bottom: 1px solid var(--line);
+    border-left: 6px solid transparent;
+  }
+  li:first-child { border-left-color: var(--marker); }
+  li:last-child { border-bottom: 0; }
+  .name { font-weight: 700; word-break: break-word; }
+  .time { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+  .empty, .error { padding: 24px 20px; margin: 0; }
+  .empty { color: var(--muted); }
+  .error { color: var(--danger); font-weight: 600; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Yodnoma</h1>
+  <p class="sub">Ismingizni yozing, u bazada saqlanadi.</p>
+
+  <form id="forma">
+    <input id="ism" type="text" maxlength="100" placeholder="Ismingiz" autocomplete="off" required aria-label="Ismingiz">
+    <button id="tugma" type="submit">Saqlash</button>
+  </form>
+
+  <section class="sheet" aria-live="polite">
+    <div class="sheet-head"><span>Saqlanganlar</span><span id="soni">0</span></div>
+    <ul id="royxat"></ul>
+    <p id="xabar" class="empty" hidden></p>
+  </section>
+</main>
+
+<script>
+  const API = "/.netlify/functions/api";
+  const forma = document.getElementById("forma");
+  const ism = document.getElementById("ism");
+  const tugma = document.getElementById("tugma");
+  const royxat = document.getElementById("royxat");
+  const xabar = document.getElementById("xabar");
+  const soni = document.getElementById("soni");
+
+  function xabarKo(matn, xato) {
+    xabar.textContent = matn;
+    xabar.className = xato ? "error" : "empty";
+    xabar.hidden = false;
+  }
+
+  function vaqt(s) {
+    const d = new Date(s);
+    return isNaN(d) ? "" : d.toLocaleString("uz-UZ", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
+
+  async function yukla() {
+    try {
+      const javob = await fetch(API);
+      const data = await javob.json();
+      if (!javob.ok) throw new Error(data.error || "Noma'lum xato");
+      royxat.innerHTML = "";
+      soni.textContent = data.length;
+      if (data.length === 0) { xabarKo("Hali hech narsa yo'q. Birinchi ismni yozing.", false); return; }
+      xabar.hidden = true;
+      data.forEach(q => {
+        const li = document.createElement("li");
+        const a = document.createElement("span");
+        a.className = "name"; a.textContent = q.name;
+        const b = document.createElement("span");
+        b.className = "time"; b.textContent = vaqt(q.created_at);
+        li.append(a, b);
+        royxat.append(li);
+      });
+    } catch (e) {
+      royxat.innerHTML = "";
+      xabarKo("Bazaga ulanib bo'lmadi: " + e.message + ". Netlify'da env'ni tekshiring va qayta Deploy qiling.", true);
+    }
+  }
+
+  forma.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const qiymat = ism.value.trim();
+    if (!qiymat) return;
+    tugma.disabled = true;
+    try {
+      const javob = await fetch(API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: qiymat })
+      });
+      const data = await javob.json();
+      if (!javob.ok) throw new Error(data.error || "Saqlanmadi");
+      ism.value = "";
+      await yukla();
+    } catch (err) {
+      xabarKo("Saqlanmadi: " + err.message, true);
+    } finally {
+      tugma.disabled = false;
+    }
+  });
+
+  yukla();
+</script>
+</body>
+</html>
