@@ -1,0 +1,8 @@
+{
+  "name": "mysql-demo",
+  "version": "1.0.0",
+  "description": "MySQL (TiDB) + Netlify Functions demo",
+  "dependencies": {
+    "mysql2": "^3.11.0"
+  }
+}
